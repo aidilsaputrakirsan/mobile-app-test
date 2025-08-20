@@ -10,11 +10,11 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import TodoItem from './components/TodoItem';
-import AddTodo from './components/AddTodo';
-import { todoService } from './services/supabase';
+import TodoItem from '../components/TodoItem';
+import AddTodo from '../components/AddTodo';
+import { todoService } from '../services/supabase';
 
-export default function App() {
+export default function HomeScreen() {
   const [todos, setTodos] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
