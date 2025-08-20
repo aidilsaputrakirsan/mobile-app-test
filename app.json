@@ -41,9 +41,11 @@
       "typedRoutes": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "your-project-id-here"
+        "projectId": "d561ab68-48ed-48ae-aa23-15e2ba95040f"
       }
-    }
+    },
+    "owner": "aidilsaputrakirsan"
   }
 }

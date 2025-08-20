@@ -1,0 +1,78 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v4
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          cache: npm
+
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 👷 Build APK
+        run: eas build --platform android --profile preview --non-interactive --no-wait
+        
+      - name: 📱 Get build URL
+        id: build-url
+        run: |
+          sleep 30
+          BUILD_ID=$(eas build:list --platform android --status in-progress --limit 1 --json | jq -r '.[0].id')
+          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
+          echo "Build ID: $BUILD_ID"
+          
+      - name: ⏳ Wait for build completion
+        run: |
+          BUILD_ID="${{ steps.build-url.outputs.build_id }}"
+          echo "Waiting for build $BUILD_ID to complete..."
+          
+          while true; do
+            STATUS=$(eas build:list --platform android --limit 1 --json | jq -r '.[0].status')
+            echo "Current status: $STATUS"
+            
+            if [ "$STATUS" = "finished" ]; then
+              echo "Build completed successfully!"
+              break
+            elif [ "$STATUS" = "errored" ] || [ "$STATUS" = "canceled" ]; then
+              echo "Build failed with status: $STATUS"
+              exit 1
+            fi
+            
+            sleep 60
+          done
+
+      - name: 📥 Download APK
+        run: |
+          BUILD_ID="${{ steps.build-url.outputs.build_id }}"
+          DOWNLOAD_URL=$(eas build:list --platform android --limit 1 --json | jq -r '.[0].artifacts.buildUrl')
+          echo "Download URL: $DOWNLOAD_URL"
+          
+          curl -o todo-app.apk "$DOWNLOAD_URL"
+          
+      - name: 📤 Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: todo-app-apk
+          path: todo-app.apk
+          retention-days: 30

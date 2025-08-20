@@ -1,17 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Alert,
+  TextInput,
+  Modal,
+  Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 const TodoItem = ({ todo, onToggle, onDelete, onEdit }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(todo.task);
+
   const handleToggle = async () => {
     try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (Platform.OS !== 'web') {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
       await onToggle(todo.id, !todo.completed);
     } catch (error) {
       Alert.alert('Error', 'Failed to update todo');
@@ -19,49 +27,84 @@ const TodoItem = ({ todo, onToggle, onDelete, onEdit }) => {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      'Delete Todo',
-      'Are you sure you want to delete this todo?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              await onDelete(todo.id);
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete todo');
-            }
+    if (Platform.OS === 'web') {
+      // For web, use window.confirm
+      if (window.confirm('Are you sure you want to delete this todo?')) {
+        deleteTodo();
+      }
+    } else {
+      // For mobile, use Alert.alert
+      Alert.alert(
+        'Delete Todo',
+        'Are you sure you want to delete this todo?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: deleteTodo,
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
+  };
+
+  const deleteTodo = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+      await onDelete(todo.id);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to delete todo');
+    }
   };
 
   const handleEdit = () => {
-    Alert.prompt(
-      'Edit Todo',
-      'Enter new task:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Save',
-          onPress: async (newTask) => {
-            if (newTask && newTask.trim()) {
-              try {
-                await onEdit(todo.id, { task: newTask.trim() });
-              } catch (error) {
-                Alert.alert('Error', 'Failed to update todo');
+    if (Platform.OS === 'web') {
+      // For web, use modal
+      setEditText(todo.task);
+      setIsEditing(true);
+    } else {
+      // For mobile, use Alert.prompt
+      Alert.prompt(
+        'Edit Todo',
+        'Enter new task:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Save',
+            onPress: async (newTask) => {
+              if (newTask && newTask.trim()) {
+                try {
+                  await onEdit(todo.id, { task: newTask.trim() });
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to update todo');
+                }
               }
-            }
+            },
           },
-        },
-      ],
-      'plain-text',
-      todo.task
-    );
+        ],
+        'plain-text',
+        todo.task
+      );
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (editText && editText.trim()) {
+      try {
+        await onEdit(todo.id, { task: editText.trim() });
+        setIsEditing(false);
+      } catch (error) {
+        Alert.alert('Error', 'Failed to update todo');
+      }
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditText(todo.task);
+    setIsEditing(false);
   };
 
   return (
@@ -94,6 +137,42 @@ const TodoItem = ({ todo, onToggle, onDelete, onEdit }) => {
           <Text style={styles.deleteButtonText}>🗑️</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Edit Modal for Web */}
+      <Modal
+        visible={isEditing}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancelEdit}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Todo</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editText}
+              onChangeText={setEditText}
+              placeholder="Enter new task..."
+              autoFocus
+              multiline={false}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={handleCancelEdit}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleSaveEdit}
+              >
+                <Text style={styles.saveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -168,6 +247,66 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     fontSize: 16,
+  },
+  // Modal styles for web editing
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '80%',
+    maxWidth: 400,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+    color: '#333',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 20,
+    color: '#333',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontWeight: '600',
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });
 
