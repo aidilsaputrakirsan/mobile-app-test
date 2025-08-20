@@ -32,47 +32,51 @@ jobs:
         run: npm ci
 
       - name: 👷 Build APK
-        run: eas build --platform android --profile preview --non-interactive --no-wait
-        
-      - name: 📱 Get build URL
-        id: build-url
-        run: |
-          sleep 30
-          BUILD_ID=$(eas build:list --platform android --status in-progress --limit 1 --json | jq -r '.[0].id')
-          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
-          echo "Build ID: $BUILD_ID"
-          
-      - name: ⏳ Wait for build completion
-        run: |
-          BUILD_ID="${{ steps.build-url.outputs.build_id }}"
-          echo "Waiting for build $BUILD_ID to complete..."
-          
-          while true; do
-            STATUS=$(eas build:list --platform android --limit 1 --json | jq -r '.[0].status')
-            echo "Current status: $STATUS"
-            
-            if [ "$STATUS" = "finished" ]; then
-              echo "Build completed successfully!"
-              break
-            elif [ "$STATUS" = "errored" ] || [ "$STATUS" = "canceled" ]; then
-              echo "Build failed with status: $STATUS"
-              exit 1
-            fi
-            
-            sleep 60
-          done
+        run: eas build --platform android --profile preview --non-interactive
 
-      - name: 📥 Download APK
+      - name: 📱 Get latest build info
+        id: build-info
         run: |
-          BUILD_ID="${{ steps.build-url.outputs.build_id }}"
-          DOWNLOAD_URL=$(eas build:list --platform android --limit 1 --json | jq -r '.[0].artifacts.buildUrl')
-          echo "Download URL: $DOWNLOAD_URL"
+          echo "Getting latest build info..."
+          BUILD_INFO=$(eas build:list --platform android --limit 1 --json)
+          echo "Build info: $BUILD_INFO"
+          BUILD_ID=$(echo $BUILD_INFO | jq -r '.[0].id')
+          BUILD_STATUS=$(echo $BUILD_INFO | jq -r '.[0].status')
+          BUILD_URL=$(echo $BUILD_INFO | jq -r '.[0].artifacts.buildUrl // empty')
           
-          curl -o todo-app.apk "$DOWNLOAD_URL"
+          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
+          echo "build_status=$BUILD_STATUS" >> $GITHUB_OUTPUT
+          echo "build_url=$BUILD_URL" >> $GITHUB_OUTPUT
           
-      - name: 📤 Upload APK artifact
+          echo "Build ID: $BUILD_ID"
+          echo "Build Status: $BUILD_STATUS"
+          echo "Build URL: $BUILD_URL"
+
+      - name: 📥 Download APK (if available)
+        if: steps.build-info.outputs.build_url != ''
+        run: |
+          BUILD_URL="${{ steps.build-info.outputs.build_url }}"
+          if [ "$BUILD_URL" != "null" ] && [ "$BUILD_URL" != "" ]; then
+            echo "Downloading APK from: $BUILD_URL"
+            curl -L -o todo-app.apk "$BUILD_URL"
+          else
+            echo "Build URL not available yet. Build might still be in progress."
+            echo "Build Status: ${{ steps.build-info.outputs.build_status }}"
+            echo "Build ID: ${{ steps.build-info.outputs.build_id }}"
+          fi
+          
+      - name: 📤 Upload APK artifact (if exists)
+        if: hashFiles('todo-app.apk') != ''
         uses: actions/upload-artifact@v4
         with:
           name: todo-app-apk
           path: todo-app.apk
           retention-days: 30
+
+      - name: 📋 Build Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Build ID: ${{ steps.build-info.outputs.build_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ steps.build-info.outputs.build_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Platform: Android" >> $GITHUB_STEP_SUMMARY
+          echo "- Profile: preview" >> $GITHUB_STEP_SUMMARY
