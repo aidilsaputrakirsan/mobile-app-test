@@ -34,49 +34,37 @@ jobs:
       - name: 👷 Build APK
         run: eas build --platform android --profile preview --non-interactive
 
-      - name: 📱 Get latest build info
-        id: build-info
-        run: |
-          echo "Getting latest build info..."
-          BUILD_INFO=$(eas build:list --platform android --limit 1 --json)
-          echo "Build info: $BUILD_INFO"
-          BUILD_ID=$(echo $BUILD_INFO | jq -r '.[0].id')
-          BUILD_STATUS=$(echo $BUILD_INFO | jq -r '.[0].status')
-          BUILD_URL=$(echo $BUILD_INFO | jq -r '.[0].artifacts.buildUrl // empty')
-          
-          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
-          echo "build_status=$BUILD_STATUS" >> $GITHUB_OUTPUT
-          echo "build_url=$BUILD_URL" >> $GITHUB_OUTPUT
-          
-          echo "Build ID: $BUILD_ID"
-          echo "Build Status: $BUILD_STATUS"
-          echo "Build URL: $BUILD_URL"
-
-      - name: 📥 Download APK (if available)
-        if: steps.build-info.outputs.build_url != ''
-        run: |
-          BUILD_URL="${{ steps.build-info.outputs.build_url }}"
-          if [ "$BUILD_URL" != "null" ] && [ "$BUILD_URL" != "" ]; then
-            echo "Downloading APK from: $BUILD_URL"
-            curl -L -o todo-app.apk "$BUILD_URL"
-          else
-            echo "Build URL not available yet. Build might still be in progress."
-            echo "Build Status: ${{ steps.build-info.outputs.build_status }}"
-            echo "Build ID: ${{ steps.build-info.outputs.build_id }}"
-          fi
-          
-      - name: 📤 Upload APK artifact (if exists)
-        if: hashFiles('todo-app.apk') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: todo-app-apk
-          path: todo-app.apk
-          retention-days: 30
-
       - name: 📋 Build Summary
         run: |
-          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- Build ID: ${{ steps.build-info.outputs.build_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Status: ${{ steps.build-info.outputs.build_status }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Platform: Android" >> $GITHUB_STEP_SUMMARY
-          echo "- Profile: preview" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎉 Build Submitted Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📱 Android APK Build" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Submitted to EAS Build" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform:** Android" >> $GITHUB_STEP_SUMMARY
+          echo "- **Profile:** preview (APK)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Time:** ~10-15 minutes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 Download APK" >> $GITHUB_STEP_SUMMARY
+          echo "1. Wait for build completion (~15 minutes)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Check build status: \`eas build:list\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Download from EAS dashboard or CLI" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Useful Commands" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Check build status" >> $GITHUB_STEP_SUMMARY
+          echo "eas build:list" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Download specific build" >> $GITHUB_STEP_SUMMARY
+          echo "eas build:download [BUILD_ID]" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📋 Next Steps
+        run: |
+          echo "Build submitted successfully! 🎉"
+          echo ""
+          echo "📱 Your Android APK is building in EAS cloud"
+          echo "⏳ Build time: ~10-15 minutes"
+          echo "📥 Download will be available after completion"
+          echo ""
+          echo "🔗 Monitor build progress:"
+          echo "   https://expo.dev/accounts/aidilsaputrakirsan/projects/TodoApp/builds"
